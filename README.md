@@ -11,7 +11,7 @@ model. You can download the basic english tagger on the [official
 homepage](https://nlp.stanford.edu/software/tagger.shtml "Stanford POS
                 Tag official website"). 
 Extract the zip-file into the subdirectory `stanford_models` of this module.
-Alternatively you can supply the path to the model in the call to
+Alternatively, you can supply the path to the model in the call to
 `load_stanford_pos`.
 
 To see example output run `expand.py` directly using `python expand.py`.
@@ -25,6 +25,8 @@ here. In this you can also see how to use this module.
   by punctuation) are signs for contraction and will be dealt
   with as such. 
 - The input sentence is grammatically correct.
+- The only replacements needed to be done are defined in
+  `contractions.yaml`
   
 ### Notable drawbacks
 

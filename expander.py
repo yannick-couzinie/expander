@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """
 Class for expanding contractions in english text.
 
@@ -12,6 +15,8 @@ TODO-list:
       asserting that the right results come out.
 
 """
+
+__author__ = "Yannick Couzinié"
 
 # standard library imports
 import yaml

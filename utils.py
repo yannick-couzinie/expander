@@ -3,6 +3,8 @@
 
 """ General utilities file """
 
+__author__ = "Yannick Couzinié"
+
 # standard library imports
 import glob
 import os

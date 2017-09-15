@@ -1,20 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""
-Class for expanding contractions in english text.
-
-TODO-list:
-    - Fix the case for Who'd've thought, in which Who'd gets recognized
-      as only one word while it is two. Causing the program to replace 3
-      words.
-    - Disambiguate replacements where the list has multiple elements!
-    - Is it possible to replace only using the contraction part and not
-      the part in front of that? In an attempt to handle names.
-    - Include a test case when this is run as __main__, correctly
-      asserting that the right results come out.
-
-"""
+""" Class for expanding contractions in english text. """
 
 __author__ = "Yannick Couzinié"
 

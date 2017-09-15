@@ -48,7 +48,9 @@ def expand_contractions(stanford_model, sent_list, is_split=True):
     Returns:
         sent_list with expanded contractions.
     """
-    tuple_list = _conv_2_word_pos(stanford_model, sent_list, is_split)
+    tuple_list = utils.conv_2_word_pos(stanford_model,
+                                       sent_list,
+                                       is_split=is_split)
 
     with open("contractions.yaml", "r") as stream:
         contractions = yaml.load(stream)
@@ -110,35 +112,6 @@ def expand_contractions(stanford_model, sent_list, is_split=True):
                     else:
                         raise RuntimeError("This should never happen.")
     return tuple_list
-
-
-def _conv_2_word_pos(stanford_model, sent_list, is_split):
-    """
-    Converts a sentence list to a list of lists, where the lists contain
-    (word, pos_tag) tuples using the provided stanford_model.
-
-    Args:
-        stanford_model - object of StanfordPOSTagger, as returned by
-                         load_stanford_pos.
-        sent_list - List with sentences split up into list of singular words
-                    e.g. [["I", "am", "sentence", "one"],
-                          ["I", "am", "sentence", "two"]]
-        is_split - if False then the input should be
-                         ["I am sentence one",
-                          "I am sentence two"]
-
-    Returns:
-           output - the same list of sentences, with each word replaced by
-                     a (word, tag) tuple.
-    """
-    output = []
-    if not is_split:
-        for sent in sent_list:
-            output.append(nltk.word_tokenize(sent))
-    else:
-        output = sent_list
-    output = [stanford_model.tag(e) for e in output]
-    return output
 
 
 if __name__ == '__main__':

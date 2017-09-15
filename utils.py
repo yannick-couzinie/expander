@@ -65,3 +65,32 @@ def load_stanford_pos(dirname=None,
     # load the model
     stanford_model = nltk.tag.StanfordPOSTagger(model_name)
     return stanford_model
+
+
+def conv_2_word_pos(stanford_model, sent_list, is_split):
+    """
+    Converts a sentence list to a list of lists, where the lists contain
+    (word, pos_tag) tuples using the provided stanford_model.
+
+    Args:
+        stanford_model - object of StanfordPOSTagger, as returned by
+                         load_stanford_pos.
+        sent_list - List with sentences split up into list of singular words
+                    e.g. [["I", "am", "sentence", "one"],
+                          ["I", "am", "sentence", "two"]]
+        is_split - if False then the input should be
+                         ["I am sentence one",
+                          "I am sentence two"]
+
+    Returns:
+           output - the same list of sentences, with each word replaced by
+                     a (word, tag) tuple.
+    """
+    output = []
+    if not is_split:
+        for sent in sent_list:
+            output.append(nltk.word_tokenize(sent))
+    else:
+        output = sent_list
+    output = [stanford_model.tag(e) for e in output]
+    return output

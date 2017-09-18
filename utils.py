@@ -17,16 +17,6 @@ def load_stanford(model,
                   model_name=None,
                   dirname=None):
     """
-    Load the Stanford module specified by model.
-    For this you have to download the model from:
-
-        https://nlp.stanford.edu/software/stanford-postagger-2017-06-09.zip
-        https://nlp.stanford.edu/software/stanford-ner-2017-06-09.zip
-
-    respectively and unzip the containers into the stanford_model
-    sub-directory of this model or alternatively in the specified
-    dirname.
-
     Args:
         model - either "pos" or "ner" for pos-tagging or named entity
                 recognition.
@@ -38,6 +28,16 @@ def load_stanford(model,
         An object of Stanford(POS/NER)Tagger
     Raises:
         LookupError if the model is not found.
+
+    Load the Stanford module specified by model.
+    For this you have to download the model from:
+
+        https://nlp.stanford.edu/software/stanford-postagger-2017-06-09.zip
+        https://nlp.stanford.edu/software/stanford-ner-2017-06-09.zip
+
+    respectively and unzip the containers into the stanford_model
+    sub-directory of this model or alternatively in the specified
+    dirname.
     """
     if model == 'pos':
         sub_dir = "models"
@@ -94,9 +94,6 @@ def load_stanford(model,
 
 def conv_2_word_pos(stanford_model, sent_list, is_split):
     """
-    Converts a sentence list to a list of lists, where the lists contain
-    (word, pos_tag) tuples using the provided stanford_model.
-
     Args:
         stanford_model - object of StanfordPOSTagger, as returned by
                          load_stanford_pos.
@@ -110,6 +107,9 @@ def conv_2_word_pos(stanford_model, sent_list, is_split):
     Returns:
            output - the same list of sentences, with each word replaced by
                      a (word, tag) tuple.
+
+    Converts a sentence list to a list of lists, where the lists contain
+    (word, pos_tag) tuples using the provided stanford_model.
     """
     output = []
     if not is_split:

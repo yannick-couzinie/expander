@@ -15,15 +15,15 @@ import utils
 
 def _extract_contractions(sent):
     """
-    Based on the POS-tags and the existence of an apostrophe or not,
-    extract the existing contractions.
-
     Args:
         sent - a single sentence split up into (word, pos) tuples.
     Returns:
         List with the indices in the sentence where the contraction
         starts.
         Or None if no contractions are in the sentence.
+
+    Based on the POS-tags and the existence of an apostrophe or not,
+    extract the existing contractions.
     """
     idx_lst = []
     for i, word_pos in enumerate(sent):
@@ -42,9 +42,6 @@ def _extract_contractions(sent):
 
 def _extract_replacements(idx_lst, sent, contractions):
     """
-    Based on the idx_lst and the contractions dictionary, give a list of
-    replacements which shall be performed on the words in sent.
-
     Args:
         idx_lst - The list of indices for the position of contractions
                   in sent.
@@ -59,6 +56,9 @@ def _extract_replacements(idx_lst, sent, contractions):
         Examples are:
             ([0,1], ["I", "'m"], ["I", "am"])
             ([0,1], ["She", "'s"], [["She", "is"], ["She", "has"]])
+
+    Based on the idx_lst and the contractions dictionary, give a list of
+    replacements which shall be performed on the words in sent.
     """
     output = []
     for i, index in enumerate(idx_lst):
@@ -114,12 +114,12 @@ def _extract_replacements(idx_lst, sent, contractions):
 
 def _remove_pos_tags(sent):
     """
-    Convert a list of (word, pos) tuples back to a list of only words.
-
     Args:
         sent - list of (word, pos) tuples
     Returns:
         A list of only lexical items.
+
+    Convert a list of (word, pos) tuples back to a list of only words.
     """
     output = []
     for word_pos in sent:
@@ -129,6 +129,17 @@ def _remove_pos_tags(sent):
 
 def expand_contractions(stanford_model, sent_list, is_split=True):
     """
+    Args:
+        stanford_model - object of StanfordPOSTagger, as returned by
+                         load_stanford_pos.
+        sent_list - list of sentences which are split up by word.
+                    For the splitting use nltk.word_tokenize.
+        is_split - boolean to track whether splitting has to be done
+                   or not. If it has to be done provide sentences as
+                   single strings.
+    Returns:
+        sent_list with expanded contractions.
+
     This method uses the StanfordPOSTagger tags to identify contractions in
     the sentence and expand them sensibly. Some examples are:
         "I'm" -> "I am"
@@ -141,18 +152,6 @@ def expand_contractions(stanford_model, sent_list, is_split=True):
     Furthermore, a difficulty lies in the fact that the expansion is not
     unique. Without context we have for example the following:
         "I'll" -> "I will" or "I shall"
-
-    Args:
-        stanford_model - object of StanfordPOSTagger, as returned by
-                         load_stanford_pos.
-        sent_list - list of sentences which are split up by word.
-                    For the splitting use nltk.word_tokenize.
-        is_split - boolean to track whether splitting has to be done
-                   or not. If it has to be done provide sentences as
-                   single strings.
-
-    Returns:
-        sent_list with expanded contractions.
     """
     tuple_list = utils.conv_2_word_pos(stanford_model,
                                        sent_list,

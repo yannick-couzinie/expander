@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" Class for expanding contractions in english text. """
+""" Module for expanding contractions in english text. """
 
 __author__ = "Yannick Couzinié"
 
@@ -185,6 +185,7 @@ def expand_contractions(stanford_model, sent_list, is_split=True):
                     tmp[index] = rplc_tuple[2][0][i]
                 output.append(tmp)
             else:
+                # else deal with the ambiguos case
                 output.append(["AMBIGUOUS"] + _remove_pos_tags(sent))
 
     if not is_split:
@@ -209,7 +210,7 @@ if __name__ == '__main__':
         "She said she'd gone.",  # she'd -> had
         ]
     # use nltk to split the strings into words
-    MODEL = utils.load_stanford_pos()
+    MODEL = utils.load_stanford(model='ner')
     # get the list oif pos_tags
     EXPANDED_LIST = expand_contractions(MODEL, TEST_CASES, is_split=False)
     for SENT in EXPANDED_LIST:

@@ -10,12 +10,17 @@ To be able to run the code you need to download a Stanford POS-tagger
 model. You can download the basic english tagger on the [official
 homepage](https://nlp.stanford.edu/software/tagger.shtml "Stanford POS
                 Tag official website"). 
-Extract the zip-file into the subdirectory `stanford_models` of this module.
+Furthermore to enhance the POS-tagging the named-entity recognition
+model from the Stanford Core NLP set is used as well, it can be
+downloaded on it's respective [official 
+homepage](https://nlp.stanford.edu/software/CRF-NER.shtml "Stanford NER
+                official website").
+Extract the zip-file(s) into the subdirectory `stanford_models` of this module.
 Alternatively, you can supply the path to the model in the call to
-`load_stanford_pos`.
+`load_stanford` as documented in the program.
 
 To see example output run `expand.py` directly using `python expand.py`.
-You can supply your own directory to the call of `load_stanford_pos`
+You can supply your own directory to the call of `load_stanford()`
 here. In this you can also see how to use this module.
 
 ### Assumptions being made
@@ -27,6 +32,8 @@ here. In this you can also see how to use this module.
 - The input sentence is grammatically correct.
 - The only replacements needed to be done are defined in
   `contractions.yaml`
+- There is no replacement longer than 3 words. One of those examples
+  woud be "Who'd've" to "Who would have".
   
 ### Notable drawbacks
 

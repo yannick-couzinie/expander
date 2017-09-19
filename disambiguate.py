@@ -20,56 +20,38 @@ import nltk
 import utils
 
 
-def _check_ambiguous_contractions(expanded_words):
+def _find_sub_list(sublist, full_list):
     """
     Args:
-        - expanded_words is a list of 1, 2 or 3 words which is checked for
-          existing contractions.
+        - sublist is a list of words that are supposed to be found in
+          the full list.
+        - full list is a list of words that is supposed to be searched
+          in.
     Returns:
-        - either the contraction if there is one, or None.
+        - List of tuples with the form
+            (first_index_of_occurence, last_index_of_occurence)
 
-    Use the contractions.yaml to check whether therer are ambiguous
-    contractions to make in the provided words.
-    Only ambiguous ones are checked since the non-ambiguous once should
-    not be handled with POS-tags but directly.
+    This function finds all occurences of sublist in the full_list.
     """
-    with open("contractions.yaml", "r") as stream:
-        # load the dictionary containing all the contractions
-        contractions = yaml.load(stream)
-
-    for key, value in contractions.items():
-        if len(value) == 1:
-            # ignore the non-ambiguous case
-            continue
-        elif expanded_words in value:
-            # else check whether the words are an expansoin
-            # and if they are return the contraction split up into
-            # single words
-            if len(expanded_words.split()) in [2, 3]:
-                # if you contract three or two words,
-                # just split at apostrophes
-                tmp = key.split("'")
-                assert len(tmp) == len(expanded_words.split())
-                # add the apostrophes again
-                tmp[1] = "'" + tmp[1]
-                if len(tmp) == 3:
-                    tmp[2] = "'" + tmp[2]
-            else:
-                # this case is only entered when there is only one word
-                # input. So assert that this is the case.
-                assert len(expanded_words) == 1
-                # this is a completely pathological case, since
-                # ambiguous 1-word replacements are not in the common
-                # list of replacements from wikipedia. But since one can
-                # openly expand contractions.yaml it is checked.
-                tmp = key
-            return tmp
-    return None
+    # this is the output list
+    results = []
+    sublist_len = len(sublist)
+    # loop over all ind if the word in full_list[ind] matches the first
+    # word of the sublist
+    for ind in (i for i, word in enumerate(full_list)
+                if word == sublist[0]):
+        # check that the complete sublist is matched
+        if full_list[ind:ind+sublist_len] == sublist:
+            # then append this to the results
+            results.append((ind, ind+sublist_len-1))
+    return results
 
 
-def _contract_sentences(sent_lst):
+def _contract_sentences(expansions, sent_lst):
     """
     Args:
+        - expansions is a dictionary containing  the corresponding
+          contractions to the expanded words
         - sent_lst is a list of sentences, which is itself a list of
           words, i.e. [["I", "am", "blue"], [...]].
     Returns:
@@ -89,36 +71,60 @@ def _contract_sentences(sent_lst):
     and then goes on to the second+third, then the second+third+fourth
     and so on.
     """
-    for sent in sent_lst:
-        for j, word in enumerate(sent):
-            # join the relevant three words
-            try:
-                check_word = ' '.join([word, sent[j+1], sent[j+2]])
-            except IndexError:
-                # this happens if we are amongst the last two words
-                check_word = None
-            # check whether they are in the dictionary
-            contraction = _check_ambiguous_contractions(check_word)
-            if contraction is None:
-                # check for two words in three words didn't give
-                # anything
-                try:
-                    check_word = ' '.join([word, sent[j+1]])
-                except IndexError:
-                    # if word is the last word
-                    check_word = None
-                contraction = _check_ambiguous_contractions(check_word)
-            if contraction is None:
-                # and lastly the one word case
-                check_word = word
-                contraction = _check_ambiguous_contractions(check_word)
-            if contraction is None:
-                # if it is still None there are no contractions to be
-                # done.
-                continue
-            contr_sent = sent[:j] + contraction
-            contr_sent += sent[j+len(contraction):]
-            yield (j, sent[j:j+len(contraction)], contr_sent)
+    # first find the indices of the sentences that contain contractions
+    contains_contractibles = []
+    key_list = list(expansions.keys())
+    for i, sent in enumerate(sent_lst):
+        # check whether any expansion is present then add the index
+        # it has a True for every expansion that is present
+        expansion_bool = [expansion in ' '.join(sent) for expansion
+                          in key_list]
+        if any(expansion_bool):
+            # convert the boolean list to a list of indices
+            expansion_idx = [i for i, boolean in enumerate(expansion_bool)
+                             if boolean]
+            # add the index of the relevant sentences together with the
+            # indices for the relevant replacements to the
+            # contains_contractibles list
+            contains_contractibles.append([i, expansion_idx])
+
+    for i, expansion_idx in contains_contractibles:
+        # the sentence to be evaluated
+        sent = sent_lst[i]
+        # the list of relevant expansions for the sentence as found
+        # earlier
+        relevant_exp = [key_list[i] for i in expansion_idx]
+        for expansion in relevant_exp:
+            # first split the contraction up into a list of the same
+            # length as the expanded string
+            if len(expansion.split()) in [2, 3]:
+                # if you contract three or two words,
+                # just split at apostrophes
+                contraction = expansions[expansion].split("'")
+                assert len(contraction) == len(expansion.split())
+                # add the apostrophes again
+                contraction[1] = "'" + contraction[1]
+                if len(contraction) == 3:
+                    contraction[2] = "'" + contraction[2]
+            else:
+                # this case is only entered when there is only one word
+                # input. So assert that this is the case.
+                assert len(expansion) == 1
+                # this is a completely pathological case, since
+                # ambiguous 1-word replacements are not in the common
+                # list of replacements from wikipedia. But since one can
+                # openly expand contractions.yaml it is checked.
+                contraction = expansions[expansion]
+            # find where the sublist occurs
+            occurences = _find_sub_list(expansion.split(), sent)
+            # loop over all first indices of occurences
+            for occurence in occurences:
+                first_index = occurence[0]
+                contr_sent = sent[:first_index] + contraction
+                contr_sent += sent[first_index+len(contraction):]
+                yield (first_index,
+                       sent[first_index:first_index+len(contraction)],
+                       contr_sent)
 
 
 def write_dictionary(sent_lst):
@@ -135,10 +141,27 @@ def write_dictionary(sent_lst):
     (contraction, pos-tag) combinations get expanded to which ambiguous
     long form.
     """
+    with open("contractions.yaml", "r") as stream:
+        # load the dictionary containing all the contractions
+        contractions = yaml.load(stream)
+
+    # invert the dictionary for quicker finding of contractions
+    expansions = dict()
+    for key, value in contractions.items():
+        if len(value) == 1:
+            continue
+        for expansion in value:
+            if expansion in expansions:
+                print("WARNING: As an expansion to {}, {} is replaced with"
+                      " {}.".format(expansion,
+                                    expansions[expansion],
+                                    key))
+            expansions[expansion] = key
+
     output_dict = dict()
     model = utils.load_stanford("pos")
     ambiguity_counter = 0
-    for tuple_rslt in _contract_sentences(sent_lst):
+    for tuple_rslt in _contract_sentences(expansions, sent_lst):
         # pos tag the sentence
         pos_sent = model.tag(tuple_rslt[2])
         # extract the pos tags on the contracted part
@@ -146,22 +169,25 @@ def write_dictionary(sent_lst):
                                                   len(tuple_rslt[1]))])
         # write a dictionary entry connecting the (words, pos) of the
         # contraction to the expanded part
+        word = ' '.join(tuple_rslt[1])
         if contr_pos not in output_dict:
-            output_dict[contr_pos] = [' '.join(tuple_rslt[1])]
+            output_dict[contr_pos] = dict()
+            output_dict[contr_pos][word] = 1
             # keep track of the progress
             print("\n\n ---- \n\n")
             pprint.pprint(output_dict)
             print("Ambiguity counter is {}.".format(ambiguity_counter))
             print("\n\n ---- \n\n")
-        elif ' '.join(tuple_rslt[1]) in output_dict[contr_pos]:
+        elif word in output_dict[contr_pos].keys():
             # check whether the entry is already there
+            output_dict[contr_pos][word] += 1
             continue
         else:
             # if the combination of pos tags with words already occured
             # once then a list has to be made. Ideally this case doesn't
             # occur
             ambiguity_counter += 1
-            output_dict[contr_pos] += [' '.join(tuple_rslt[1])]
+            output_dict[contr_pos][word] = 1
             print("\n\n ---- \n\n")
             print("AMBIGUITY ADDED!")
             pprint.pprint(output_dict)

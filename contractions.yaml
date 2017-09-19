@@ -3,7 +3,7 @@
 # certainly not appear).
 
 "ain't": ["am not", "are not", "is not", "has not", "have not"]
-"aren't": ["are not", "am not"]
+"aren't": ["are not"] # , "am not" it appears twice
 "can't": ["cannot"]
 "can't've": ["cannot have"]
 "'cause": ["because"]

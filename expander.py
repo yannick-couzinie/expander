@@ -209,7 +209,7 @@ if __name__ == '__main__':
         "She said she'd gone.",  # she'd -> had
         ]
     # use nltk to split the strings into words
-    MODEL = utils.load_stanford(model='ner')
+    MODEL = utils.load_stanford(model='pos')
     # get the list oif pos_tags
     EXPANDED_LIST = expand_contractions(MODEL, TEST_CASES, is_split=False)
     for SENT in EXPANDED_LIST:

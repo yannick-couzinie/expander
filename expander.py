@@ -6,6 +6,8 @@
 __author__ = "Yannick Couzinié"
 
 # standard library imports
+import itertools
+import operator
 import yaml
 # third party library imports
 import nltk
@@ -40,6 +42,29 @@ def _extract_contractions(sent):
         return idx_lst
 
 
+def _consecutive_sub_list(int_list):
+    """
+    Args:
+        - int_list is a list whose consecutive sub-lists are yielded
+          from this function.
+    Yields:
+        - The consecutive sub-lists
+
+    This is basically an adaptation from
+    https://docs.python.org/2.6/library/itertools.html#examples for
+    Python 3.
+    """
+    # we group the items by using the lambda-function for the key which
+    # checks whether the next element and the current element is one
+    # apart. If it it is exactly one, the list of items that are 1 apart
+    # are grouped.
+    # The map with the itemgetter then maps the grouping to the actual
+    # items and then we yield the sublists.
+    for _, index in itertools.groupby(enumerate(int_list),
+                                      lambda x: x[1]-x[0]):
+        yield list(map(operator.itemgetter(1), index))
+
+
 def _extract_replacements(idx_lst, sent, contractions):
     """
     Args:
@@ -53,63 +78,42 @@ def _extract_replacements(idx_lst, sent, contractions):
         A list in the form of (tuples of (index of words to be replaced,
                                           word to be replaced,
                                           list of suggested replacements))
-        Examples are:
-            ([0,1], ["I", "'m"], ["I", "am"])
+        Examples are: ([0,1], ["I", "'m"], ["I", "am"])
             ([0,1], ["She", "'s"], [["She", "is"], ["She", "has"]])
 
     Based on the idx_lst and the contractions dictionary, give a list of
     replacements which shall be performed on the words in sent.
     """
-    output = []
-    for i, index in enumerate(idx_lst):
-        # check whether the next word also starts with an apostrophe,
-        # an example for this is "Who'd've"
-        triple = False  # flag for keeping track of triple contraction
-        if i+1 < len(idx_lst) and idx_lst[i+1] == idx_lst[i]+1:
-            tmp = ''.join([sent[index-1][0],
-                           sent[index][0],
-                           sent[index+1][0]])
-            triple = True
-        # check whether the previous word was already a contraction, in
-        # that case the previous loop iteration should have taken care
-        # of it, so just continue.
-        elif i > 0 and idx_lst[i-1] == idx_lst[i]-1:
-            continue
-        # else it is just a single apostrophe contraction, so just join
-        # the current with the previous word, e.g.
-        #       ["I", "'m"] -> "I'm"
-        else:
-            tmp = ''.join([sent[index-1][0],
-                           sent[index][0]])
-
-        # if the contracted string is one of the known contractions,
+    # loop over all the consecutive parts
+    for consecutive in _consecutive_sub_list(idx_lst):
+        # add the one index prior to the first one for easier
+        # replacements
+        consecutive = [consecutive[0]-1] + consecutive
+        # combine all the words that are expanded, i.e. one word
+        # before the first apostrophe until the last one with an
+        # apostrophe
+        contr = [word_pos[0] for word_pos
+                 in sent[consecutive[0]:consecutive[-1]+1]]
+        # if the expanded string is one of the known contractions,
         # extract the suggested expansions.
-        # Note that however many expansions there are tmp2 is a list!
-        if tmp in contractions:
-            tmp2 = contractions[tmp]
+        # Note that however many expansions there are, expanded is a list!
+        if ''.join(contr) in contractions:
+            expanded = contractions[''.join(contr)]
         # the dictionary only contains non-capitalized replacements,
         # check for capitalization
-        elif tmp.lower() in contractions:
-            if tmp[0].isupper():
+        elif ''.join(contr).lower() in contractions:
+            if ''.join(contr)[0].isupper():
                 # capitalize the replacement in this case
-                tmp2 = [a.capitalize() for a in
-                        contractions[tmp.lower()]]
+                expanded = [a.capitalize() for a in
+                            contractions[''.join(contr).lower()]]
         else:
-            print("WARNING: Unknown replacement: ", tmp)
+            # if the replacement is unknown skip to the next one
+            print("WARNING: Unknown replacement: ", ''.join(contr))
+            continue
 
         # separate the phrases into their respective words again.
-        tmp2 = [nltk.word_tokenize(a) for a in tmp2]
-        if triple:
-            tmp = [sent[index-1][0],
-                   sent[index][0],
-                   sent[index+1][0]]
-            index_range = [index-1, index, index+1]
-        else:
-            tmp = [sent[index-1][0],
-                   sent[index][0]]
-            index_range = [index-1, index]
-        output.append((index_range, tmp, tmp2))
-    return output
+        expanded = [nltk.word_tokenize(a) for a in expanded]
+        yield (consecutive, contr, expanded)
 
 
 def _remove_pos_tags(sent):
@@ -172,11 +176,11 @@ def expand_contractions(stanford_model, sent_list, is_split=True):
             output.append(_remove_pos_tags(sent))
             continue
 
-        # evaluate the needed replacements
-        replacement_lst = _extract_replacements(idx_lst,
+        # evaluate the needed replacements, and loop over them
+        for rplc_tuple in _extract_replacements(idx_lst,
                                                 sent,
-                                                contractions)
-        for rplc_tuple in replacement_lst:
+                                                contractions):
+
             # if the replacement is unambiguous, do it.
             if len(rplc_tuple[2]) == 1:
                 tmp = _remove_pos_tags(sent)
@@ -207,6 +211,8 @@ if __name__ == '__main__':
         "Who'd've thought!",  # 'd -> would, 've -> have
         "She said she'd go.",  # she'd -> she would
         "She said she'd gone.",  # she'd -> had
+        "Y'all'd've a great time"  # wouldn't it be so cold!"
+        # Y'all'd've -> You all would have, wouldn't -> would not
         ]
     # use nltk to split the strings into words
     MODEL = utils.load_stanford(model='pos')

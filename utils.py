@@ -116,17 +116,27 @@ def conv_2_word_pos(stanford_model, sent_list, is_split):
         for sent in sent_list:
             tmp = nltk.word_tokenize(sent)
             for i, word in enumerate(tmp):
-                if "'" in word[1:-1]:
+                j = 0
+                # This while loop breaks once there is no apostrophe
+                # left anymore.
+                while "'" in word[1:-1]:
                     tmp2 = []
                     # search for ' in the middle of the word indicating
                     # that the splitting is not correct. An example is:
                     #   Who'd've -> Who'd, 've
                     # so we need to check and split up further.
-                    tmp2 = tmp[:i]
-                    tmp2.append(word.split("'")[0])
-                    tmp2.append("'" + word.split("'")[1])
-                    tmp2 += tmp[i+1:]
+                    tmp2 = tmp[:i+j]
+                    # if this is not the first apostrophe, take care to
+                    # add the apostrophe again
+                    if j:
+                        tmp2.append("'" + word.split("'", 1)[0])
+                    else:
+                        tmp2.append(word.split("'", 1)[0])
+                    tmp2.append("'" + word.split("'", 1)[1])
+                    word = word.split("'", 1)[1]
+                    tmp2 += tmp[i+j+1:]
                     tmp = tmp2
+                    j += 1
             output.append(tmp)
     else:
         output = sent_list

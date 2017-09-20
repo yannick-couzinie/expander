@@ -32,8 +32,6 @@ here. In this you can also see how to use this module.
 - The input sentence is grammatically correct.
 - The only replacements needed to be done are defined in
   `contractions.yaml`
-- There is no replacement longer than 3 words. One of those examples
-  woud be "Who'd've" to "Who would have".
   
 ### Notable drawbacks
 
@@ -49,3 +47,4 @@ here. In this you can also see how to use this module.
   the part in front of that? In an attempt to handle names.
 - Include a test case when this is `expander.py` is run directly, 
   correctly asserting that the right results come out.
+- Handle the n't contraction correctly.

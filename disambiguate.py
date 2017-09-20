@@ -97,7 +97,7 @@ def _contract_sentences(expansions, sent_lst):
         for expansion in relevant_exp:
             # first split the contraction up into a list of the same
             # length as the expanded string
-            if len(expansion.split()) in [2, 3]:
+            if len(expansion.split()) in [2, 3, 4]:
                 # if you contract three or two words,
                 # just split at apostrophes
                 contraction = expansions[expansion].split("'")
@@ -106,6 +106,8 @@ def _contract_sentences(expansions, sent_lst):
                 contraction[1] = "'" + contraction[1]
                 if len(contraction) == 3:
                     contraction[2] = "'" + contraction[2]
+                if len(contraction) == 4:
+                    contraction[3] = "'" + contraction[3]
             else:
                 # this case is only entered when there is only one word
                 # input. So assert that this is the case.
@@ -118,6 +120,7 @@ def _contract_sentences(expansions, sent_lst):
             # find where the sublist occurs
             occurences = _find_sub_list(expansion.split(), sent)
             # loop over all first indices of occurences
+            # and insert the contracted part
             for occurence in occurences:
                 first_index = occurence[0]
                 contr_sent = sent[:first_index] + contraction
@@ -127,11 +130,14 @@ def _contract_sentences(expansions, sent_lst):
                        contr_sent)
 
 
-def write_dictionary(sent_lst):
+def write_dictionary(sent_lst, add_tags=0):
     """
     Args:
         - sent-lst a list of sentences which themselves are lists of the
           single words.
+        - add_tags is the amount of pos tags used after the
+          relevant contraction, this can be used to further
+          disambiguate but (of course) spreads out the data.
     Returns:
         - None, but writes a disambiguations.yaml file with disambiguations
           for the ambiguous contractions in contractions.yaml.
@@ -165,8 +171,15 @@ def write_dictionary(sent_lst):
         # pos tag the sentence
         pos_sent = model.tag(tuple_rslt[2])
         # extract the pos tags on the contracted part
-        contr_pos = tuple(pos_sent[tuple_rslt[0]:(tuple_rslt[0] +
-                                                  len(tuple_rslt[1]))])
+        contr_word_pos = pos_sent[tuple_rslt[0]:(tuple_rslt[0] +
+                                                 len(tuple_rslt[1]))]
+        if add_tags == 0:
+            contr_pos = tuple(contr_word_pos)
+        else:
+            add_pos_list = pos_sent[len(tuple_rslt[1]):(len(tuple_rslt[1]) +
+                                                        add_tags)]
+            add_pos = [pos_word[1] for pos_word in add_pos_list]
+            contr_pos = tuple(contr_word_pos + add_pos)
         # write a dictionary entry connecting the (words, pos) of the
         # contraction to the expanded part
         word = ' '.join(tuple_rslt[1])
@@ -200,5 +213,7 @@ def write_dictionary(sent_lst):
 if __name__ == '__main__':
     # if you call this function directly just build the disambiguation
     # dictionary.
+    # load a corpus that has the form of list of sentences which is
+    # split up into a list of words
     SENT_LST = nltk.corpus.brown.sents()
-    write_dictionary(SENT_LST)
+    write_dictionary(SENT_LST, add_tags=2)

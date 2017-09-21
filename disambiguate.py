@@ -47,13 +47,23 @@ def _find_sub_list(sublist, full_list):
     return results
 
 
-def _contract_sentences(expansions, sent_lst):
+def _contract_sentences(expansions,
+                        sent_lst,
+                        use_ner,
+                        ner_args):
     """
     Args:
         - expansions is a dictionary containing  the corresponding
           contractions to the expanded words
         - sent_lst is a list of sentences, which is itself a list of
           words, i.e. [["I", "am", "blue"], [...]].
+        - use_ner is boolean to decide whether to use
+          named-entity-recognition for a potential increase in
+          accuracy but with the obvious costs of performance.
+        - ner_args is a list with an  object of StanfordNERTagger and
+          the tag to be used. This only needs to be
+          supplied if use_ner is true.
+
     Returns:
         - yields tuples of the form
               (index of first word that was replaced,
@@ -72,28 +82,27 @@ def _contract_sentences(expansions, sent_lst):
     and so on.
     """
     # first find the indices of the sentences that contain contractions
-    contains_contractibles = []
-    key_list = list(expansions.keys())
-    for i, sent in enumerate(sent_lst):
+
+    for sent in sent_lst:
+        if use_ner:
+            # replace all named entities with the tag in ner_args[1]
+            # throw away replacement info
+            sent = utils.sent_to_ner(ner_args[0], sent,
+                                     tag=ner_args[1])[0]
         # check whether any expansion is present then add the index
         # it has a True for every expansion that is present
         expansion_bool = [expansion in ' '.join(sent) for expansion
-                          in key_list]
-        if any(expansion_bool):
-            # convert the boolean list to a list of indices
-            expansion_idx = [i for i, boolean in enumerate(expansion_bool)
-                             if boolean]
-            # add the index of the relevant sentences together with the
-            # indices for the relevant replacements to the
-            # contains_contractibles list
-            contains_contractibles.append([i, expansion_idx])
+                          in list(expansions.keys())]
+        if not any(expansion_bool):
+            # if no expansions present just continue
+            continue
 
-    for i, expansion_idx in contains_contractibles:
-        # the sentence to be evaluated
-        sent = sent_lst[i]
-        # the list of relevant expansions for the sentence as found
-        # earlier
-        relevant_exp = [key_list[i] for i in expansion_idx]
+        # convert the boolean list to a list of indices
+        expansion_idx = [i for i, boolean in enumerate(expansion_bool)
+                         if boolean]
+
+        # the list of relevant expansions for the sentence
+        relevant_exp = [list(expansions.keys())[i] for i in expansion_idx]
         for expansion in relevant_exp:
             # first split the contraction up into a list of the same
             # length as the expanded string
@@ -122,30 +131,17 @@ def _contract_sentences(expansions, sent_lst):
             # loop over all first indices of occurences
             # and insert the contracted part
             for occurence in occurences:
-                first_index = occurence[0]
-                contr_sent = sent[:first_index] + contraction
-                contr_sent += sent[first_index+len(contraction):]
-                yield (first_index,
-                       sent[first_index:first_index+len(contraction)],
+                contr_sent = sent[:occurence[0]] + contraction
+                contr_sent += sent[occurence[0]+len(contraction):]
+                yield (occurence[0],
+                       sent[occurence[0]:occurence[0]+len(contraction)],
                        contr_sent)
 
 
-def write_dictionary(sent_lst, add_tags=0):
+def _invert_contractions_dict():
     """
-    Args:
-        - sent-lst a list of sentences which themselves are lists of the
-          single words.
-        - add_tags is the amount of pos tags used after the
-          relevant contraction, this can be used to further
-          disambiguate but (of course) spreads out the data.
-    Returns:
-        - None, but writes a disambiguations.yaml file with disambiguations
-          for the ambiguous contractions in contractions.yaml.
-
-    Using the provided list of sentences, contract them and pos-tag them.
-    Using the pos-tags it is then possible to classify which
-    (contraction, pos-tag) combinations get expanded to which ambiguous
-    long form.
+    This is just a short function to return the inverted dictionary
+    of the contraction dictionary.
     """
     with open("contractions.yaml", "r") as stream:
         # load the dictionary containing all the contractions
@@ -158,18 +154,71 @@ def write_dictionary(sent_lst, add_tags=0):
             continue
         for expansion in value:
             if expansion in expansions:
-                print("WARNING: As an expansion to {}, {} is replaced with"
+                print("WARNING: As an contraction to {}, {} is replaced with"
                       " {}.".format(expansion,
                                     expansions[expansion],
                                     key))
             expansions[expansion] = key
+    return expansions
+
+
+def write_dictionary(pos_model,
+                     sent_lst,
+                     add_tags=0,
+                     use_ner=False,
+                     ner_args=None):
+    """
+    Args:
+        - pos_model is an instance of StanfordPOSTagger
+        - sent-lst a list of sentences which themselves are lists of the
+          single words.
+        - add_tags is the amount of pos tags used after the
+          relevant contraction, this can be used to further
+          disambiguate but (of course) spreads out the data.
+        - use_ner is boolean to decide whether to use
+          named-entity-recognition for a potential increase in
+          accuracy but with the obvious costs of performance.
+        - ner_args is a list with an  object of StanfordNERTagger and
+          the tag to be used. This only needs to be
+          supplied if use_ner is true.
+
+    Returns:
+        - None, but writes a disambiguations.yaml file with disambiguations
+          for the ambiguous contractions in contractions.yaml.
+
+    Raises:
+        ValueError if use_ner is True but no ner_model is supplied.
+
+    Using the provided list of sentences, contract them and pos-tag them.
+    Using the pos-tags it is then possible to classify which
+    (contraction, pos-tag) combinations get expanded to which ambiguous
+    long form.
+    """
+    # pylint: disable=too-many-locals
+    if use_ner and (ner_args is None):
+        raise ValueError("The use_ner flag is True but no NER"
+                         " model has been supplied!")
+
+    expansions = _invert_contractions_dict()
 
     output_dict = dict()
-    model = utils.load_stanford("pos")
     ambiguity_counter = 0
-    for tuple_rslt in _contract_sentences(expansions, sent_lst):
+    for tuple_rslt in _contract_sentences(expansions,
+                                          sent_lst,
+                                          use_ner=use_ner,
+                                          ner_args=ner_args):
         # pos tag the sentence
-        pos_sent = model.tag(tuple_rslt[2])
+        if use_ner:
+            # first replace the NER tag with "it"
+            pos_sent = [word.replace(ner_args[1], "it") for word
+                        in tuple_rslt[2]]
+            # tag the sentence
+            pos_sent = pos_model.tag(pos_sent)
+            # and replace it with the tag again
+            pos_sent = [(tuple_rslt[2][i], word_pos[1]) for i, word_pos
+                        in enumerate(pos_sent)]
+        else:
+            pos_sent = pos_model.tag(tuple_rslt[2])
         # extract the pos tags on the contracted part
         contr_word_pos = pos_sent[tuple_rslt[0]:(tuple_rslt[0] +
                                                  len(tuple_rslt[1]))]
@@ -216,4 +265,10 @@ if __name__ == '__main__':
     # load a corpus that has the form of list of sentences which is
     # split up into a list of words
     SENT_LST = nltk.corpus.brown.sents()
-    write_dictionary(SENT_LST, add_tags=2)
+    POS_MODEL = utils.load_stanford('pos')
+    NER_MODEL = utils.load_stanford('ner')
+    write_dictionary(POS_MODEL,
+                     SENT_LST,
+                     add_tags=2,
+                     use_ner=True,
+                     ner_args=[NER_MODEL, "<NE>"])

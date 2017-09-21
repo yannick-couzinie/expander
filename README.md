@@ -43,8 +43,7 @@ here. In this you can also see how to use this module.
 ### TODOs
 
 - Disambiguate replacements where the list has multiple elements!
-- Is it possible to replace only using the contraction part and not
-  the part in front of that? In an attempt to handle names.
 - Include a test case when this is `expander.py` is run directly, 
   correctly asserting that the right results come out.
-- Handle the n't contraction correctly.
+- Write a function that divides list at certain characters (apostrophe
+                in our case)

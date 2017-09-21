@@ -37,6 +37,9 @@ def _extract_contractions(sent):
                 # pronouns like "Peter's house", in which the apostrophe
                 # denotes possession and not contraction.
                 idx_lst.append(i)
+        elif word_pos[0] == "n't":
+            # if it is the special case of n't add it immediately
+            idx_lst.append(i)
     if idx_lst:
         # empty list is false so use that, otherwise give no return.
         return idx_lst
@@ -131,7 +134,11 @@ def _remove_pos_tags(sent):
     return output
 
 
-def expand_contractions(stanford_model, sent_list, is_split=True):
+def expand_contractions(stanford_model,
+                        sent_list,
+                        is_split=True,
+                        use_ner=False,
+                        ner_args=None):
     """
     Args:
         stanford_model - object of StanfordPOSTagger, as returned by
@@ -141,8 +148,17 @@ def expand_contractions(stanford_model, sent_list, is_split=True):
         is_split - boolean to track whether splitting has to be done
                    or not. If it has to be done provide sentences as
                    single strings.
+        use_ner - boolean to decide whether to use
+                  named-entity-recognition for a potential increase in
+                  accuracy but with the obvious costs of performance.
+        ner_args - is a list with an  object of StanfordNERTagger and
+                   the tag to be used. This only needs to be
+                   supplied if use_ner is true.
     Returns:
         sent_list with expanded contractions.
+
+    Raises:
+        ValueError if use_ner is True but no ner_model is supplied.
 
     This method uses the StanfordPOSTagger tags to identify contractions in
     the sentence and expand them sensibly. Some examples are:
@@ -152,14 +168,14 @@ def expand_contractions(stanford_model, sent_list, is_split=True):
     contraction but a possessive pronoun like
         "It's legs were shaking"
     which should not be expanded. The stanford tagger tags this as
-    "POSS" for possessive which makes it easy to identify these cases.
+    "POS" for possessive which makes it easy to identify these cases.
     Furthermore, a difficulty lies in the fact that the expansion is not
     unique. Without context we have for example the following:
         "I'll" -> "I will" or "I shall"
     """
-    tuple_list = utils.conv_2_word_pos(stanford_model,
-                                       sent_list,
-                                       is_split=is_split)
+    if use_ner and (ner_args is None):
+        raise ValueError("The use_ner flag is True but no NER"
+                         " model has been supplied!")
 
     with open("contractions.yaml", "r") as stream:
         # load the dictionary containing all the contractions
@@ -167,30 +183,47 @@ def expand_contractions(stanford_model, sent_list, is_split=True):
 
     output = []
     # look at all the sentences in the list
-    for sent in tuple_list:
+    for word_pos_ner in utils.conv_2_word_pos(stanford_model,
+                                              sent_list,
+                                              is_split=is_split,
+                                              use_ner=use_ner,
+                                              ner_args=ner_args):
+        if use_ner:
+            # the actual sentence is just the first element, the second
+            # one is the list of strings that were replaced (i.e. the
+            # named-entities).
+            sent = word_pos_ner[0]
+        else:
+            sent = word_pos_ner
+
         # get all the indices of the contractions
         idx_lst = _extract_contractions(sent)
-
+        tmp = _remove_pos_tags(sent)
         if idx_lst is None:
             # if there are no contractions, continue
-            output.append(_remove_pos_tags(sent))
-            continue
+            sent = tmp
+        else:
+            # evaluate the needed replacements, and loop over them
+            for rplc_tuple in _extract_replacements(idx_lst,
+                                                    sent,
+                                                    contractions):
 
-        # evaluate the needed replacements, and loop over them
-        for rplc_tuple in _extract_replacements(idx_lst,
-                                                sent,
-                                                contractions):
-
-            # if the replacement is unambiguous, do it.
-            if len(rplc_tuple[2]) == 1:
-                tmp = _remove_pos_tags(sent)
-                for i, index in enumerate(rplc_tuple[0]):
-                    tmp[index] = rplc_tuple[2][0][i]
-                output.append(tmp)
-            else:
-                # else deal with the ambiguos case
-                output.append(["AMBIGUOUS"] + _remove_pos_tags(sent))
-
+                # if the replacement is unambiguous, do it.
+                if len(rplc_tuple[2]) == 1:
+                    for i, index in enumerate(rplc_tuple[0]):
+                        tmp[index] = rplc_tuple[2][0][i]
+                    sent = tmp
+                else:
+                    # else deal with the ambiguous case
+                    sent = tmp + ["AMBIGUOUS"]
+        output.append(sent)
+        # at this point there is definetly the next item added to
+        # output. So just replace the NER-tag now
+        if use_ner:
+            # just replace it in the last element
+            output[-1] = utils.ner_to_sent(output[-1],
+                                           word_pos_ner[1],
+                                           tag=ner_args[1])
     if not is_split:
         # join the sentences if they were joined in the beginning
         output = [' '.join(sent) for sent in output]
@@ -202,21 +235,27 @@ def expand_contractions(stanford_model, sent_list, is_split=True):
 
 if __name__ == '__main__':
     TEST_CASES = [
-        "I'm a bad person",  # 'm -> am
-        "It's not what you think",  # 's -> is
-        "It's his cat anyway",  # 's -> is
-        "It's a man's world",  # 's -> is and 's possessive
-        "Catherine's been thinking about it",  # 's -> has
-        "It'll be done",  # 'll -> will
-        "Who'd've thought!",  # 'd -> would, 've -> have
-        "She said she'd go.",  # she'd -> she would
-        "She said she'd gone.",  # she'd -> had
-        "Y'all'd've a great time"  # wouldn't it be so cold!"
+         "I won't let you get away with that",  # won't ->  will not
+         "I'm a bad person",  # 'm -> am
+         "It's not what you think",  # 's -> is
+         "It's his cat anyway",  # 's -> is
+         "It's a man's world",  # 's -> is and 's possessive
+         "Catherine's been thinking about it",  # 's -> has
+         "It'll be done",  # 'll -> will
+         "Who'd've thought!",  # 'd -> would, 've -> have
+         "She said she'd go.",  # she'd -> she would
+         "She said she'd gone.",  # she'd -> had
+         "Y'all'd've a great time, wouldn't it be so cold!"
         # Y'all'd've -> You all would have, wouldn't -> would not
         ]
     # use nltk to split the strings into words
-    MODEL = utils.load_stanford(model='pos')
+    POS_MODEL = utils.load_stanford(model='pos')
+    NER_MODEL = utils.load_stanford(model='ner')
     # get the list oif pos_tags
-    EXPANDED_LIST = expand_contractions(MODEL, TEST_CASES, is_split=False)
+    EXPANDED_LIST = expand_contractions(POS_MODEL,
+                                        TEST_CASES,
+                                        is_split=False,
+                                        use_ner=True,
+                                        ner_args=[NER_MODEL, "<NE>"])
     for SENT in EXPANDED_LIST:
         print(SENT)

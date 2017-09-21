@@ -120,3 +120,8 @@
 "you'll've": ["you shall have", "you will have"]
 "you're": ["you are"]
 "you've": ["you have"]
+"<NE>'d": ["<NE> had", "<NE> would"]  # <NE> is the standard named ent<NE>y tag
+"<NE>'d've": ["<NE> would have"]
+"<NE>'ll": ["<NE> shall", "<NE> will"]
+"<NE>'ll've": ["<NE> shall have", "<NE> will have"]
+"<NE>'s": ["<NE> has", "<NE> is"]

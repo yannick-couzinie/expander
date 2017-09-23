@@ -68,6 +68,70 @@ def _consecutive_sub_list(int_list):
         yield list(map(operator.itemgetter(1), index))
 
 
+def _disambiguate(sent, rplc_tuple, disambiguations, add_tags,
+                  argmax=True):
+    """
+    Args:
+        - sent is the same sentence as in rplc_tuple but with the
+          pos_tags.
+        - rplc_tuple is the tuple containint the index of replacement,
+          the suggested replacements and the sentence.
+        - disambiguations dictionary
+        - add_tags is the amount of additional tags in the disambi
+        - in case the disambiguation case is also ambiguous use the case
+          with more occurences in the corpus. If that still doesn't help
+          don't change the input.
+    Returns:
+        - the expanded sentence (as far as unambiguous).
+
+    Use the disambiguation dictionary to disambiguate the expansions.
+    """
+    # first we need to check again whether the first word is capitalized
+    if sent[0][0][0].isupper() and sent[0][0][0] != "<NE>":
+        capitalized = True
+        sent[0] = (sent[0][0].lower(), sent[0][1])
+    else:
+        capitalized = False
+    # make the input tuple which is of the form of the dictionary keys
+    inp_tuple = [sent[i] for i in rplc_tuple[0]]
+    # append the pos tags for the rest
+    inp_tuple += [sent[i][1] for i in range(rplc_tuple[0][-1]+1,
+                                            rplc_tuple[0][-1]+1+add_tags)]
+    inp_tuple = tuple(inp_tuple)
+
+    if inp_tuple in disambiguations:
+        if len(disambiguations[inp_tuple].keys()) == 1:
+            # if this is unambiguous just handle it
+            replacement = list(disambiguations[inp_tuple])[0]
+        else:
+            # if it is ambiguous find the case with the most occurences
+            max_val = max(disambiguations[inp_tuple].values())
+            if list(disambiguations[inp_tuple].values()).count(max_val) == 1:
+                # if there is exactly one replacement with the highest
+                # value, choose that
+                for key, value in disambiguations[inp_tuple].items():
+                    if value == max_val:
+                        replacement = key
+                        break
+            else:
+                # if it is still ambigious just stop at this point and
+                # work on the disambiguations dictionary.
+                replacement = []
+    else:
+        # if the case is not even in the dictionary just skip it and
+        # work on the disambiguations dictionary.
+        replacement = []
+    # now do the replacements
+    sent = _remove_pos_tags(sent)
+    if replacement != []:
+        for i, index in enumerate(rplc_tuple[0]):
+            sent[index] = replacement.split()[i]
+
+    if capitalized:
+        sent[0] = sent[0].title()
+    return sent
+
+
 def _extract_replacements(idx_lst, sent, contractions):
     """
     Args:
@@ -181,6 +245,18 @@ def expand_contractions(stanford_model,
         # load the dictionary containing all the contractions
         contractions = yaml.load(stream)
 
+    with open("disambiguations.yaml", "r") as stream:
+        disambiguations = yaml.load(stream)
+
+    # first we need to check how many additional tags there are
+    # for that take the first element of the keys list of the
+    # dictionary
+    add_tags = 0
+    for element in list(disambiguations)[0]:
+        # if the type is str and not tuple it is an additional tag
+        if type(element) is str:
+            add_tags += 1
+
     output = []
     # look at all the sentences in the list
     for word_pos_ner in utils.conv_2_word_pos(stanford_model,
@@ -215,7 +291,8 @@ def expand_contractions(stanford_model,
                     sent = tmp
                 else:
                     # else deal with the ambiguous case
-                    sent = tmp + ["AMBIGUOUS"]
+                    sent = _disambiguate(sent, rplc_tuple,
+                                         disambiguations, add_tags)
         output.append(sent)
         # at this point there is definetly the next item added to
         # output. So just replace the NER-tag now
@@ -237,8 +314,8 @@ if __name__ == '__main__':
     TEST_CASES = [
          "I won't let you get away with that",  # won't ->  will not
          "I'm a bad person",  # 'm -> am
-         "It's not what you think",  # 's -> is
          "It's his cat anyway",  # 's -> is
+         "It's not what you think",  # 's -> is
          "It's a man's world",  # 's -> is and 's possessive
          "Catherine's been thinking about it",  # 's -> has
          "It'll be done",  # 'll -> will
@@ -246,7 +323,7 @@ if __name__ == '__main__':
          "She said she'd go.",  # she'd -> she would
          "She said she'd gone.",  # she'd -> had
          "Y'all'd've a great time, wouldn't it be so cold!"
-        # Y'all'd've -> You all would have, wouldn't -> would not
+         # Y'all'd've -> You all would have, wouldn't -> would not
         ]
     # use nltk to split the strings into words
     POS_MODEL = utils.load_stanford(model='pos')

@@ -19,6 +19,9 @@ import nltk
 # local library imports
 import utils
 
+# increase the allowed ram size that the models can use
+# nltk.internals.config_java(options='-xmx2G')
+
 
 def _find_sub_list(sublist, full_list):
     """
@@ -270,5 +273,5 @@ if __name__ == '__main__':
     write_dictionary(POS_MODEL,
                      SENT_LST,
                      add_tags=2,
-                     use_ner=True,
+                     use_ner=False,
                      ner_args=[NER_MODEL, "<NE>"])

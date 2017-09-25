@@ -268,10 +268,14 @@ if __name__ == '__main__':
     # load a corpus that has the form of list of sentences which is
     # split up into a list of words
     SENT_LST = nltk.corpus.brown.sents()
+    SENT_LST += nltk.corpus.gutenberg.sents()
+    SENT_LST += nltk.corpus.webtext.sents()
+    SENT_LST += nltk.corpus.reuters.sents()
+    SENT_LST += nltk.corpus.inaugural.sents()
     POS_MODEL = utils.load_stanford('pos')
     NER_MODEL = utils.load_stanford('ner')
     write_dictionary(POS_MODEL,
                      SENT_LST,
-                     add_tags=1,
+                     add_tags=2,
                      use_ner=False,
                      ner_args=[NER_MODEL, "<NE>"])

@@ -104,6 +104,11 @@ def _disambiguate(sent, rplc_tuple, disambiguations, add_tags,
             # if this is unambiguous just handle it
             replacement = list(disambiguations[inp_tuple])[0]
         else:
+            if not argmax:
+                # if one should not take the argmax just replace nothing. This
+                # is not recommended, but in the future it might be interesting
+                # to differentiate the cases.
+                replacement = []
             # if it is ambiguous find the case with the most occurences
             max_val = max(disambiguations[inp_tuple].values())
             if list(disambiguations[inp_tuple].values()).count(max_val) == 1:
@@ -254,7 +259,7 @@ def expand_contractions(stanford_model,
     add_tags = 0
     for element in list(disambiguations)[0]:
         # if the type is str and not tuple it is an additional tag
-        if type(element) is str:
+        if isinstance(element, str):
             add_tags += 1
 
     output = []
@@ -312,23 +317,23 @@ def expand_contractions(stanford_model,
 
 if __name__ == '__main__':
     TEST_CASES = [
-         "I won't let you get away with that",  # won't ->  will not
-         "I'm a bad person",  # 'm -> am
-         "It's his cat anyway",  # 's -> is
-         "It's not what you think",  # 's -> is
-         "It's a man's world",  # 's -> is and 's possessive
-         "Catherine's been thinking about it",  # 's -> has
-         "It'll be done",  # 'll -> will
-         "Who'd've thought!",  # 'd -> would, 've -> have
-         "She said she'd go.",  # she'd -> she would
-         "She said she'd gone.",  # she'd -> had
-         "Y'all'd've a great time, wouldn't it be so cold!"
-         # Y'all'd've -> You all would have, wouldn't -> would not
+        "I won't let you get away with that",  # won't ->  will not
+        "I'm a bad person",  # 'm -> am
+        "It's his cat anyway",  # 's -> is
+        "It's not what you think",  # 's -> is
+        "It's a man's world",  # 's -> is and 's possessive
+        "Catherine's been thinking about it",  # 's -> has
+        "It'll be done",  # 'll -> will
+        "Who'd've thought!",  # 'd -> would, 've -> have
+        "She said she'd go.",  # she'd -> she would
+        "She said she'd gone.",  # she'd -> had
+        "Y'all'd've a great time, wouldn't it be so cold!"
+        # Y'all'd've -> You all would have, wouldn't -> would not
         ]
     # use nltk to split the strings into words
     POS_MODEL = utils.load_stanford(model='pos')
     NER_MODEL = utils.load_stanford(model='ner')
-    # get the list oif pos_tags
+    # expand the sentences
     EXPANDED_LIST = expand_contractions(POS_MODEL,
                                         TEST_CASES,
                                         is_split=False,

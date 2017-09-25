@@ -42,8 +42,9 @@ here. In this you can also see how to use this module.
 
 ### TODOs
 
-- Disambiguate replacements where the list has multiple elements!
 - Include a test case when this is `expander.py` is run directly, 
   correctly asserting that the right results come out.
 - Write a function that divides list at certain characters (apostrophe
                 in our case)
+- Combine the he-she-it cases to one central `<HSI>` case in order to
+  get more test cases and thusly improve accuracy.

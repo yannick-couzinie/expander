@@ -16,13 +16,16 @@ with open("disambiguations.yaml", "r") as stream:
 out_dict = inp_dic.copy()
 for key, value in inp_dic.items():
     if key[0][0] == 'it':
-        out_dict[(("<NE>", key[0][1]),
-                 key[1],
-                 key[2],
-                 key[3])] = {subkey.replace('it', '<NE>'):
-                             subvalue for subkey, subvalue
-                             in value.items()
-                             }
+        # this is a bad work-around to get the tuple to actually be a
+        # single element as a tuple and not automatically converted to a
+        # list.
+        new_key = ['placeholder']
+        new_key[0] = ("<NE>", key[0][1])
+        new_key += key[1:]
+        new_key = tuple(new_key)
+
+        out_dict[new_key] = {subkey.replace('it', '<NE>'): subvalue
+                             for subkey, subvalue in value.items()}
 
 with open("disambiguations.yaml", "w") as stream:
     yaml.dump(out_dict, stream)

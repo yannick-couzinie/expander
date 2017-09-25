@@ -272,6 +272,6 @@ if __name__ == '__main__':
     NER_MODEL = utils.load_stanford('ner')
     write_dictionary(POS_MODEL,
                      SENT_LST,
-                     add_tags=2,
+                     add_tags=1,
                      use_ner=False,
                      ner_args=[NER_MODEL, "<NE>"])

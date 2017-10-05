@@ -68,6 +68,50 @@ def _consecutive_sub_list(int_list):
         yield list(map(operator.itemgetter(1), index))
 
 
+def _return_replacement(inp_tuple, argmax, disambiguations):
+    """
+    Args:
+        - inp_tuple = the input tuple which needs to be counterchecked with the
+                      dictionary.
+        - disambiguations = dictionary with all the replacements.
+        - argmax = boolean of whether to take the argmax or not, in case of
+                   ambiguous cases.
+    Returns:
+        - The recommended replacements as stored in the values of
+          disambiguations. It returns None in case of no replacements.
+
+    This function strictly serves to return the replacements for ambiguous
+    cases, i.e. as stored in disambiguations.yaml.
+    """
+
+    if inp_tuple in disambiguations:
+        if len(disambiguations[inp_tuple].keys()) == 1:
+            # if this is unambiguous just handle it
+            return list(disambiguations[inp_tuple])[0]
+        else:
+            if not argmax:
+                # if one should not take the argmax just replace nothing. This
+                # is not recommended, but in the future it might be interesting
+                # to differentiate the cases.
+                return None
+            # if it is ambiguous find the case with the most occurences
+            max_val = max(disambiguations[inp_tuple].values())
+            if list(disambiguations[inp_tuple].values()).count(max_val) == 1:
+                # if there is exactly one replacement with the highest
+                # value, choose that
+                for key, value in disambiguations[inp_tuple].items():
+                    if value == max_val:
+                        return key
+            else:
+                # if it is still ambigious just stop at this point and
+                # work on the disambiguations dictionary.
+                return None
+    else:
+        # if the case is not even in the dictionary just skip it and
+        # work on the disambiguations dictionary.
+        return None
+
+
 def _disambiguate(sent, rplc_tuple, disambiguations, add_tags,
                   argmax=True):
     """
@@ -87,7 +131,12 @@ def _disambiguate(sent, rplc_tuple, disambiguations, add_tags,
     Use the disambiguation dictionary to disambiguate the expansions.
     """
     # first we need to check again whether the first word is capitalized
-    if sent[0][0][0].isupper() and sent[0][0][0] != "<NE>":
+    # a special case is when the first sign actually is an apostrophe like 't
+    # (in 'tis)
+    # so check wheter one of the first two characters is upper and make sure
+    # that it is not the ner_tag
+    if ((sent[0][0][0].isupper() or sent[0][0][1].isupper())
+            and sent[0][0] != "<NE>"):
         capitalized = True
         sent[0] = (sent[0][0].lower(), sent[0][1])
     else:
@@ -99,42 +148,57 @@ def _disambiguate(sent, rplc_tuple, disambiguations, add_tags,
                                             rplc_tuple[0][-1]+1+add_tags)]
     inp_tuple = tuple(inp_tuple)
 
-    if inp_tuple in disambiguations:
-        if len(disambiguations[inp_tuple].keys()) == 1:
-            # if this is unambiguous just handle it
-            replacement = list(disambiguations[inp_tuple])[0]
-        else:
-            if not argmax:
-                # if one should not take the argmax just replace nothing. This
-                # is not recommended, but in the future it might be interesting
-                # to differentiate the cases.
-                replacement = []
-            # if it is ambiguous find the case with the most occurences
-            max_val = max(disambiguations[inp_tuple].values())
-            if list(disambiguations[inp_tuple].values()).count(max_val) == 1:
-                # if there is exactly one replacement with the highest
-                # value, choose that
-                for key, value in disambiguations[inp_tuple].items():
-                    if value == max_val:
-                        replacement = key
-                        break
-            else:
-                # if it is still ambigious just stop at this point and
-                # work on the disambiguations dictionary.
-                replacement = []
-    else:
-        # if the case is not even in the dictionary just skip it and
-        # work on the disambiguations dictionary.
-        replacement = []
+    # analyze disambiguations for the correct replacement
+    replacement = _return_replacement(inp_tuple, argmax, disambiguations)
     # now do the replacements
     sent = _remove_pos_tags(sent)
-    if replacement != []:
+    if replacement is not None:
         for i, index in enumerate(rplc_tuple[0]):
             sent[index] = replacement.split()[i]
 
     if capitalized:
         sent[0] = sent[0].title()
     return sent
+
+
+def _check_if_contr_in_dict(consecutive, sent, contractions):
+    """
+    Args:
+        - consecutive = a list of consecutive indices at which sent contains
+                        contractions.
+        - sent = a (word, pos_tag) list, whereby the words make up a sentence.
+        - contractions = the contractions dictionary.
+    Returns:
+        - the list of possible expansions.
+    Raises:
+        - ValueError if the contractions have questionable capitalization,
+          which will not be reproduced upon expansion since that would be too
+          cumbersome.
+    """
+    # combine all the words that are expanded, i.e. one word
+    # before the first apostrophe until the last one with an
+    # apostrophe
+    contr = [word_pos[0] for word_pos
+             in sent[consecutive[0]:consecutive[-1]+1]]
+    # if the expanded string is one of the known contractions,
+    # extract the suggested expansions.
+    # Note that however many expansions there are, expanded is a list!
+    if ''.join(contr) in contractions:
+        expanded = contractions[''.join(contr)]
+    # the dictionary only contains non-capitalized replacements,
+    # check for capitalization
+    elif ''.join(contr).lower() in contractions:
+        if ''.join(contr)[0].isupper() or ''.join(contr)[1].isupper():
+            # capitalize the replacement in this case
+            expanded = [a.capitalize() for a in
+                        contractions[''.join(contr).lower()]]
+        else:
+            raise ValueError("Weird capitalization error! Please use standard "
+                             "english grammar.")
+    else:
+        # if the replacement is unknown skip to the next one
+        return None, contr
+    return expanded, contr
 
 
 def _extract_replacements(idx_lst, sent, contractions):
@@ -158,33 +222,32 @@ def _extract_replacements(idx_lst, sent, contractions):
     """
     # loop over all the consecutive parts
     for consecutive in _consecutive_sub_list(idx_lst):
-        # add the one index prior to the first one for easier
-        # replacements
-        consecutive = [consecutive[0]-1] + consecutive
-        # combine all the words that are expanded, i.e. one word
-        # before the first apostrophe until the last one with an
-        # apostrophe
-        contr = [word_pos[0] for word_pos
-                 in sent[consecutive[0]:consecutive[-1]+1]]
-        # if the expanded string is one of the known contractions,
-        # extract the suggested expansions.
-        # Note that however many expansions there are, expanded is a list!
-        if ''.join(contr) in contractions:
-            expanded = contractions[''.join(contr)]
-        # the dictionary only contains non-capitalized replacements,
-        # check for capitalization
-        elif ''.join(contr).lower() in contractions:
-            if ''.join(contr)[0].isupper():
-                # capitalize the replacement in this case
-                expanded = [a.capitalize() for a in
-                            contractions[''.join(contr).lower()]]
-        else:
-            # if the replacement is unknown skip to the next one
+        # first test the consecutive list like this
+        expanded, contr = _check_if_contr_in_dict(consecutive,
+                                                  sent,
+                                                  contractions)
+
+        if expanded is None:
+            # add the one index prior to the first one for easier
+            consecutive = [consecutive[0]-1] + consecutive
+            expanded, contr = _check_if_contr_in_dict(consecutive,
+                                                      sent,
+                                                      contractions)
+        if expanded is None:
             print("WARNING: Unknown replacement: ", ''.join(contr))
-            continue
+            expanded = []
 
         # separate the phrases into their respective words again.
-        expanded = [nltk.word_tokenize(a) for a in expanded]
+        if "<NE>" in expanded[0]:
+            # insert a random name (here the name of a more or less famous
+            # japanese female head of the Ii family) to avoid <NE> being split.
+            expanded = [exp.replace("<NE>", "Naotora") for exp in expanded]
+            expanded = [nltk.word_tokenize(a) for a in expanded]
+            for i, _sent in enumerate(expanded):
+                for j in [k for k, x in enumerate(_sent) if x == "Naotora"]:
+                    expanded[i][j] = "<NE>"
+        else:
+            expanded = [nltk.word_tokenize(a) for a in expanded]
         yield (consecutive, contr, expanded)
 
 
@@ -201,6 +264,56 @@ def _remove_pos_tags(sent):
     for word_pos in sent:
         output.append(word_pos[0])
     return output
+
+
+def _do_replacements(sent, idx_lst, add_tags, contractions, disambiguations):
+
+    tmp = _remove_pos_tags(sent)
+    # only do something if there are any replacements
+    if idx_lst is None:
+        return tmp
+    # evaluate the needed replacements, and loop over them
+    for rplc_tuple in _extract_replacements(idx_lst,
+                                            sent,
+                                            contractions):
+
+        # if the replacement is unambiguous, do it.
+        if len(rplc_tuple[2]) == 1:
+            if len(rplc_tuple[1]) == len(rplc_tuple[2][0]):
+                # check that there is the exact amount of words to be
+                # replaced
+                for i, index in enumerate(rplc_tuple[0]):
+                    tmp[index] = rplc_tuple[2][0][i]
+            else:
+                for i, word in enumerate(rplc_tuple[2][0]):
+                    if i >= len(rplc_tuple[0]):
+                        # if the replacing string is longer than the
+                        # original text, we need to move all the elements
+                        # back to fit the new words in.
+
+                        # save the good text since it is not to be replaced
+                        tmp2 = tmp[rplc_tuple[0][0]+i:]
+                        # delete anything after the last replacement
+                        del tmp[rplc_tuple[0][0]+i:]
+                        # append to next words in the replacements, since from
+                        # now on every word will need to be treated like this
+                        tmp += word[i:]
+                        # add the good bits again
+                        tmp += tmp2
+                        break
+                    else:
+                        # otherwise just replace
+                        tmp[rplc_tuple[0][0]+i] = word
+                if len(rplc_tuple[2][0]) < len(rplc_tuple[0]):
+                    # if there is less to replace than there originally
+                    # was, remove anything that was not touched
+                    del tmp[rplc_tuple[0][0]+len(rplc_tuple[2][0]):
+                            rplc_tuple[0][-1]+1]
+        else:
+            # else deal with the ambiguous case
+            tmp = _disambiguate(sent, rplc_tuple,
+                                disambiguations, add_tags)
+    return tmp
 
 
 def expand_contractions(stanford_model,
@@ -279,25 +392,12 @@ def expand_contractions(stanford_model,
 
         # get all the indices of the contractions
         idx_lst = _extract_contractions(sent)
-        tmp = _remove_pos_tags(sent)
-        if idx_lst is None:
-            # if there are no contractions, continue
-            sent = tmp
-        else:
-            # evaluate the needed replacements, and loop over them
-            for rplc_tuple in _extract_replacements(idx_lst,
-                                                    sent,
-                                                    contractions):
 
-                # if the replacement is unambiguous, do it.
-                if len(rplc_tuple[2]) == 1:
-                    for i, index in enumerate(rplc_tuple[0]):
-                        tmp[index] = rplc_tuple[2][0][i]
-                    sent = tmp
-                else:
-                    # else deal with the ambiguous case
-                    sent = _disambiguate(sent, rplc_tuple,
-                                         disambiguations, add_tags)
+        sent = _do_replacements(sent,
+                                idx_lst,
+                                add_tags,
+                                contractions,
+                                disambiguations)
         output.append(sent)
         # at this point there is definetly the next item added to
         # output. So just replace the NER-tag now
@@ -309,9 +409,14 @@ def expand_contractions(stanford_model,
     if not is_split:
         # join the sentences if they were joined in the beginning
         output = [' '.join(sent) for sent in output]
-        # remove the space in front of the apostrophe, if it survived
-        # the apostrophe cleansing.
+        # remove the space in front of the punctuations.
         output = [sent.replace(" '", "'") for sent in output]
+        output = [sent.replace(" ;", ";") for sent in output]
+        output = [sent.replace(" :", ":") for sent in output]
+        output = [sent.replace(" .", ".") for sent in output]
+        output = [sent.replace(" ,", ",") for sent in output]
+        output = [sent.replace(" !", "!") for sent in output]
+        output = [sent.replace(" ?", "?") for sent in output]
     return output
 
 
@@ -327,8 +432,15 @@ if __name__ == '__main__':
         "Who'd've thought!",  # 'd -> would, 've -> have
         "She said she'd go.",  # she'd -> she would
         "She said she'd gone.",  # she'd -> had
-        "Y'all'd've a great time, wouldn't it be so cold!"
+        "Y'all'd've a great time, wouldn't it be so cold!",
         # Y'all'd've -> You all would have, wouldn't -> would not
+        " My name is Jack.",   # No replacements.
+        "'Tis questionable whether Ma'am should be going.",
+        # 'Tis -> it is, Ma'am -> madam
+        "As history tells, 'twas the night before Christmas.",
+        # 'Twas -> It was
+        "Martha, Peter and Christine've been indulging in a menage-à-trois."
+        # 've -> have
         ]
     # use nltk to split the strings into words
     POS_MODEL = utils.load_stanford(model='pos')

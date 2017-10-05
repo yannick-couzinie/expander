@@ -48,5 +48,3 @@ here. In this you can also see how to use this module.
                 in our case)
 - Combine the he-she-it cases to one central `<HSI>` case in order to
   get more test cases and thusly improve accuracy.
-- Modify `add_ner_tag.py` to add the `<NE>` tags relatively, instead of just
-  rewriting.

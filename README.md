@@ -42,9 +42,12 @@ here. In this you can also see how to use this module.
 
 ### TODOs
 
-- Include a test case when this is `expander.py` is run directly, 
+- Include a test case when `expander.py` is run directly, 
   correctly asserting that the right results come out.
 - Write a function that divides list at certain characters (apostrophe
-                in our case)
+                in our case), and refactor code with it.
 - Combine the he-she-it cases to one central `<HSI>` case in order to
-  get more test cases and thusly improve accuracy.
+  get more test cases and thusly improve accuracy (may not be sensible, as the
+  cases for he/she and it are different).
+- Adapt `load_stanford` in `utils.py` to use the new CoreNLPPOSTagger and
+  CoreNLPNERTagger instead of the deprecated ones.

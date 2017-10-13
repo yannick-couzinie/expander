@@ -33,15 +33,12 @@ def _extract_contractions(sent):
         # add the index to idx_list.
         if word_pos[0][0] == "'":
             if word_pos[1] != 'POS':
-                # a case we can immediately dismiss is possessive
-                # pronouns like "Peter's house", in which the apostrophe
-                # denotes possession and not contraction.
+                # POS stands for possessive pronoun
                 idx_lst.append(i)
         elif word_pos[0] == "n't":
-            # if it is the special case of n't add it immediately
+            # n't is treated extraordinarily and added explicitly
             idx_lst.append(i)
     if idx_lst:
-        # empty list is false so use that, otherwise give no return.
         return idx_lst
 
 

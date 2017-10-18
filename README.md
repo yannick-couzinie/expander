@@ -51,3 +51,14 @@ here. In this you can also see how to use this module.
   cases for he/she and it are different).
 - Adapt `load_stanford` in `utils.py` to use the new CoreNLPPOSTagger and
   CoreNLPNERTagger instead of the deprecated ones.
+
+### Notes about Licensing
+
+This software is distributed unter the Apache 2.0 license, mainly because NLTK
+is as well and it seems to allow enough freedom. Note though, that the stanford
+models are not distributed under that license. They are full GPL and restrict
+any kind of proprietary use. If you intend to use this software in your own
+proprietary software, either get in contact with the people at stanford or
+rewrite the program to use models included in NLTK (if you are doing that, I
+would also be grateful for a pull request with the changes).
+I have just generally found the stanford models to be more reliable.
